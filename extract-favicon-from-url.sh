@@ -69,14 +69,12 @@ if [ -n "$MANIFEST_HREF" ]; then
   log "[INFO] Found manifest URL: $MANIFEST_URL"
 
   if fetch_with_retries "$MANIFEST_URL" "$TMPDIR/manifest.json"; then
-    ICON_SRC=$(jq -r '
-      if .icons then
-        .icons
-        | map(.sizes as $sizes |
-            ($sizes | split(" ") | map(tonumber? // 0) | max) as $maxsize |
-            {src, maxsize})
-        | sort_by(.maxsize) | reverse | .[0].src
-      else empty end' "$TMPDIR/manifest.json" || true)
+    ICON_SRC=$( (
+      jq -r '.icons[] | [.sizes, .src] | @tsv' "$TMPDIR/manifest.json" 2>/dev/null || true
+    ) |
+    awk -F'\t' '{ size = $1; sub(/x.*/, "", size); if (size == "any") size = 99999; print size "\t" $2 }' |
+    sort -rn | head -n1 | cut -f2
+    )
 
     if [ -n "$ICON_SRC" ] && [ "$ICON_SRC" != "null" ]; then
       ICON_URL=$(python3 -c "import urllib.parse; print(urllib.parse.urljoin('$MANIFEST_URL','$ICON_SRC'))")
