@@ -1,24 +1,18 @@
 # Extract Favicon From Url
-This script attempts to extract the highest resolution favicon URL from a given website by checking the following in order:
+CLI shell script attempting to extract the highest resolution favicon URL from a given website, by checking the following in order:
 
-*   `manifest.json` for web app manifests.
+*   `manifest.json` (choses the highest resolution in PWA manifest)
 *   `<link rel='apple-touch-icon'>`
 *   `<link rel='icon'>`
 *   The default `./favicon.ico` path
 
-If no favicon is found through these methods, it will exit with a none zero code.
-
-(so if nothing is returned, you might want to use a default fallback icon, like `square-dashed` from [lucid icons](https://lucide.dev/icons/square-dashed).)
+Finally, if no favicon is found through these methods, it will exit with a none zero code.
 
 ## Open Tasks
-[ ] should prioritize `<link rel="apple-touch-icon">` over normal `<link rel=icon/...>`
-
-[ ] check why notion.com is not working
-
+[ ] fix deterministic local tests with own server, as in /wip_local_test
 
 ## Usage
-
-### Make the script executable
+### Setup: Make the script executable
 
 `chmod +x extract-favicon-from-url.sh`
 
@@ -34,7 +28,10 @@ Return URL of the best image found
 `./extract-favicon-from-url.sh -r 5 -d 3 https://example.com`
 
 ### Run tests
-`bash ./tests.sh`
+
+*Note: websites might change their icon settings which could make the tests fail*
+
+`bash ./tests_web.sh`
 
 or
 `chmod +x tests.sh`
