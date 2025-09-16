@@ -27,7 +27,7 @@ trap "rm -rf $TMPDIR" EXIT
 
 log() {
   if [ "$VERBOSE" -eq 1 ]; then
-    echo "$*"
+    echo "$*" >&2
   fi
 }
 
@@ -37,7 +37,9 @@ fetch_with_retries() {
   local attempt=1
   while [ $attempt -le $RETRIES ]; do
     log "[DEBUG] Attempt $attempt: fetching $url"
-    if curl -sSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36" \
+    # Standard curl builds often don't decompress content unless you tell them to. Browsers, on the other hand, always handle decompression.
+    # A common way to ask curl to handle decompression is to add the --compressed flag. This will make curl request compressed content and decompress it automatically if the server sends it.
+    if curl -sSL --compressed -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36" \
       "$url" -o "$outfile"; then
       if [ -s "$outfile" ]; then
         return 0
@@ -69,8 +71,20 @@ if [ -n "$MANIFEST_HREF" ]; then
   log "[INFO] Found manifest URL: $MANIFEST_URL"
 
   if fetch_with_retries "$MANIFEST_URL" "$TMPDIR/manifest.json"; then
+    if [ "$VERBOSE" -eq 1 ]; then
+      if ! jq -e . "$TMPDIR/manifest.json" >/dev/null 2>&1; then
+        log "[DEBUG] Manifest is not valid JSON. Content:"
+        log "---"
+        cat "$TMPDIR/manifest.json" >&2
+        log "---"
+      fi
+    fi
     ICON_SRC=$( (
-      jq -r '.icons[] | [.sizes, .src] | @tsv' "$TMPDIR/manifest.json" 2>/dev/null || true
+      if [ "$VERBOSE" -eq 1 ]; then
+        jq -r '.icons[] | [.sizes, .src] | @tsv' "$TMPDIR/manifest.json" || true
+      else
+        jq -r '.icons[] | [.sizes, .src] | @tsv' "$TMPDIR/manifest.json" 2>/dev/null || true
+      fi
     ) |
     awk -F'\t' '{ size = $1; sub(/x.*/, "", size); if (size == "any") size = 99999; print size "\t" $2 }' |
     sort -rn | head -n1 | cut -f2
@@ -136,20 +150,13 @@ EOF
 fi
 log "[DEBUG] ICON_URL after default favicon.ico path step: $ICON_URL"
 
+
+# --- Result ---
 if [ -z "$ICON_URL" ]; then
-  log "[INFO] Using default local app icon"
-  # TODO: resolve path correctly
-  ICON_URL="./default-icon.svg"
+  log "[ERROR] No Website icon found."
+  # error out
+  exit 2
 fi
 
-# --- Result ---
-# if [ -z "$ICON_URL" ]; then
-#   log "[ERROR] No Website icon found."
-#   # TODO: resolve path correctly
-#   ICON_URL="./default-icon.svg"
-#   exit 2
-# fi
-
-# --- Result ---
 log "[SUCCESS] Final icon URL:"
 echo "$ICON_URL"
