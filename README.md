@@ -1,6 +1,8 @@
 # Extract Favicon From Url
 Attempts to return the best favicon's image path by trying `manifest.json`, then `<link rel='icon'>` and finally the default `./favicon.ico` path. If no icon is found, a path to a default icon is proposed.
 
+If nothing is returned, you might want to use a default fallback icon, like `square-dashed` from [lucid icons](https://lucide.dev/icons/square-dashed).
+
 # Make the script executable
 chmod +x extract-favicon-from-url.sh
 
@@ -17,6 +19,3 @@ Returns url of the best image found
 # Run tests
 chmod +x tests.sh
 ./tests.sh ./extract-favicon-from-url.sh
-
-# Default Icon Attribution
-The default fallback icon is `square-dashed` from [lucid icons](https://lucide.dev/icons/square-dashed)
