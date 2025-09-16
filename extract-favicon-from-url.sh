@@ -60,6 +60,8 @@ fi
 
 ICON_URL=""
 
+# ========================================================================
+
 # --- Step 1: Manifest ---
 log "[INFO] Trying manifest.json..."
 MANIFEST_HREF=$(xmllint --html --xpath \
@@ -104,11 +106,13 @@ else
 fi
 log "[DEBUG] ICON_URL after manifest step: $ICON_URL"
 
+
+
 # --- Step 2: HTML <link rel=icon/...> ---
+# TODO: should prioritize <link rel="apple-touch-icon"> over normal <link rel=icon/...>
 if [ -z "$ICON_URL" ]; then
   log "[INFO] Trying HTML <link rel=icon> ..."
   # New attribute extraction logic will go here
-
 
   if [ -s "$TMPDIR/icons_list.txt" ]; then
     while IFS=$'\t' read -r P S H R; do
@@ -123,6 +127,8 @@ if [ -z "$ICON_URL" ]; then
   fi
 fi
 log "[DEBUG] ICON_URL after HTML rel=icon step: $ICON_URL"
+
+
 
 # --- Step 3: Favicon.ico ---
 if [ -z "$ICON_URL" ]; then

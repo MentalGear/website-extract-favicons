@@ -1,21 +1,41 @@
 # Extract Favicon From Url
-Attempts to return the best favicon's image path by trying `manifest.json`, then `<link rel='icon'>` and finally the default `./favicon.ico` path. If no icon is found, a path to a default icon is proposed.
+This script attempts to extract the highest resolution favicon URL from a given website by checking the following in order:
 
-If nothing is returned, you might want to use a default fallback icon, like `square-dashed` from [lucid icons](https://lucide.dev/icons/square-dashed).
+*   `manifest.json` for web app manifests.
+*   `<link rel='apple-touch-icon'>`
+*   `<link rel='icon'>`
+*   The default `./favicon.ico` path
 
-# Make the script executable
-chmod +x extract-favicon-from-url.sh
+If no favicon is found through these methods, it will exit with a none zero code.
 
-# Basic usage
-Returns url of the best image found
-./extract-favicon-from-url.sh https://example.com
+(so if nothing is returned, you might want to use a default fallback icon, like `square-dashed` from [lucid icons](https://lucide.dev/icons/square-dashed).)
 
-# Verbose output for Debugging
-./extract-favicon-from-url.sh -v https://example.com
+## Open Tasks
+[ ] should prioritize `<link rel="apple-touch-icon">` over normal `<link rel=icon/...>`
 
-# Custom retry settings
-./extract-favicon-from-url.sh -r 5 -d 3 https://example.com
+[ ] check why notion.com is not working
 
-# Run tests
-chmod +x tests.sh
-./tests.sh ./extract-favicon-from-url.sh
+
+## Usage
+
+### Make the script executable
+
+`chmod +x extract-favicon-from-url.sh`
+
+### Basic usage
+Return URL of the best image found
+
+`./extract-favicon-from-url.sh https://theguardian.com`
+
+### Verbose output for Debugging
+`./extract-favicon-from-url.sh -v https://theguardian.com`
+
+### Custom retry settings
+`./extract-favicon-from-url.sh -r 5 -d 3 https://example.com`
+
+### Run tests
+`bash ./tests.sh`
+
+or
+`chmod +x tests.sh`
+then run it

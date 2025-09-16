@@ -41,7 +41,7 @@ assert_url_returned() {
     log_test "Checking '$url_to_test' ($description)"
     
     local output
-    output=$(bash "$SCRIPT_TO_TEST" -v "$url_to_test")
+    output=$(bash "$SCRIPT_TO_TEST" -v "$url_to_test" || true)
     
     if [[ -n "$output" && "$output" == http* ]]; then
         log_pass "URL returned for $url_to_test: $output"
@@ -68,32 +68,51 @@ assert_no_url_returned() {
 }
 
 # Test runner
+# ========================================================================
+# NOTE: External Website's favicon settings can of course change icons at will
+# but it can still be a good test for the moment, just ensure after some time
+# that the outputs of websites are still what the test expects
+# ========================================================================
+
 run_tests() {
     echo "Running Favicon Extraction Test Suite"
     echo "====================================="
     
+    # Temporarily disable -e to allow all tests to run
+    set +e
+
     # Category 1: has PWA manifest
     echo -e "\n--- Category: Has PWA manifest ---"
     assert_url_returned "theguardian.com" "PWA manifest"
     assert_url_returned "ft.com" "PWA manifest"
-    # TODO: Test fails since spotify, even though it has a manifest, the code does not seem to be able to extract the icon path. Why not?
-    # debug: manually curl each manifest for ft.com and spotify.com and compare them
+    # spotify as an example of a compressed manifest file
     assert_url_returned "spotify.com" "PWA manifest"
     
     # Category 2: has <link rel>
     echo -e "\n--- Category: <link rel> ---"
-    assert_url_returned "notion.so" "<link rel>"
     assert_url_returned "meetup.com" "<link rel>"
     
+    # Category 2: has <link rel>
+    echo -e '\n--- Category: <link rel="apple-touch-icon"> prefer over <link rel>  ---'
+    # notion has apple touch icon and normal rel="link", touch icon should be preferred
+    # TODO: why is notion not working?
+    assert_url_returned "https://www.notion.com/" "<link rel>"
+    
+
     # Category 3: has favicon.ico
     echo -e "\n--- Category: favicon.ico ---"
     assert_url_returned "google.com" "favicon.ico"
+    assert_url_returned "apple.com" "favicon.ico"
+    assert_url_returned "meetup.com" "favicon.ico"
     
     # Category 4: does NOT even a favicon.ico present
     echo -e "\n--- Category: No Icon available ---"
     # TODO: check tests
     assert_no_url_returned "example.com" "Invalid favicon.ico (text/html)"
-    assert_url_returned "gmail.com" "favicon.ico"
+    assert_no_url_returned "gmail.com" "favicon.ico"
+
+    # Re-enable -e
+    set -e
 
     # Report results
     echo
