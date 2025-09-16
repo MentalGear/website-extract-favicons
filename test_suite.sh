@@ -68,46 +68,54 @@ assert_no_url_returned() {
     fi
 }
 
-# New function to test apple-touch-icon priority
+# Test apple-touch-icon priority over regular icons
 assert_apple_touch_icon_preferred() {
     local url_to_test=$1
     local description=$2
     ((TESTS_RUN++))
+    
     log_test "Checking apple-touch-icon priority for '$url_to_test' ($description)"
     
-    # Get verbose output to see the decision process
-    local full_output
+    local full_output final_url
     full_output=$(bash "$SCRIPT_TO_TEST" -v "$url_to_test" 2>&1 || true)
-    
-    # Extract the final URL (last line that starts with http)
-    local final_url
     final_url=$(echo "$full_output" | grep "^http" | tail -n1)
     
-    # Check if apple-touch-icon was mentioned in the logs
-    if echo "$full_output" | grep -q "apple-touch-icon"; then
-        # Check if the debug output shows apple-touch-icon was selected with high priority
-        if echo "$full_output" | grep -q "rel=apple-touch-icon.*priority=1[0-5]"; then
-            log_pass "Apple-touch-icon correctly prioritized for $url_to_test"
-            log_info "Selected URL: $final_url"
-        else
-            # Fallback: check if any apple-touch-icon related URL was selected
-            if [[ "$final_url" == *"apple-touch-icon"* ]] || [[ "$final_url" == *"touch-icon"* ]]; then
-                log_pass "Apple-touch-icon URL selected for $url_to_test"
-                log_info "Selected URL: $final_url"
-            else
-                log_info "Debug output for analysis:"
-                echo "$full_output" | grep -E "(apple-touch-icon|priority=|Selected)" | head -5
-                log_fail "Apple-touch-icon not properly prioritized for $url_to_test"
-            fi
-        fi
+    # Priority check hierarchy
+    if _has_apple_touch_icon_priority_evidence "$full_output"; then
+        log_pass "Apple-touch-icon correctly prioritized for $url_to_test"
+        log_info "Selected URL: $final_url"
+    elif _has_apple_touch_icon_url "$final_url"; then
+        log_pass "Apple-touch-icon URL selected for $url_to_test"
+        log_info "Selected URL: $final_url"
+    elif _has_valid_fallback_url "$final_url" "$full_output"; then
+        log_pass "Regular icon fallback worked for $url_to_test"
+        log_info "Selected URL: $final_url"
     else
-        log_info "No apple-touch-icon found for $url_to_test, checking if regular icons work"
-        if [[ -n "$final_url" && "$final_url" == http* ]]; then
-            log_pass "Regular icon fallback worked for $url_to_test"
-        else
-            log_fail "No valid icon found for $url_to_test"
-        fi
+        _show_debug_info "$full_output"
+        log_fail "Apple-touch-icon not properly prioritized for $url_to_test"
     fi
+}
+
+# Helper functions for apple-touch-icon testing
+_has_apple_touch_icon_priority_evidence() {
+    echo "$1" | grep -q "apple-touch-icon" && 
+    echo "$1" | grep -q "rel=apple-touch-icon.*priority=1[0-5]"
+}
+
+_has_apple_touch_icon_url() {
+    [[ "$1" == *"apple-touch-icon"* ]] || [[ "$1" == *"touch-icon"* ]]
+}
+
+_has_valid_fallback_url() {
+    local final_url=$1
+    local full_output=$2
+    [[ -n "$final_url" && "$final_url" == http* ]] && 
+    ! echo "$full_output" | grep -q "apple-touch-icon"
+}
+
+_show_debug_info() {
+    log_info "Debug output for analysis:"
+    echo "$1" | grep -E "(apple-touch-icon|priority=|Selected)" | head -5
 }
 
 # Test runner
@@ -128,17 +136,20 @@ run_tests() {
     echo -e "\n--- Category: Has PWA manifest ---"
     assert_url_returned "theguardian.com" "PWA manifest"
     assert_url_returned "ft.com" "PWA manifest"
+    assert_apple_touch_icon_preferred "nytimes.com" "PWA manifest"
     # spotify as an example of a compressed manifest file
     assert_url_returned "spotify.com" "PWA manifest"
+
     
     # Category 2: has <link rel>
     echo -e "\n--- Category: <link rel> ---"
     assert_url_returned "meetup.com" "<link rel>"
     
-    # Category 2b: apple-touch-icon priority test
+    # Category 2b: apple-touch-icon priority test (TODO implementation)
     echo -e '\n--- Category: <link rel="apple-touch-icon"> prefer over <link rel> ---'
     # notion has apple touch icon and normal rel="link", touch icon should be preferred
     assert_apple_touch_icon_preferred "https://www.notion.com/" "Apple-touch-icon priority test"
+    
     # Additional test sites known to have apple-touch-icons
     assert_apple_touch_icon_preferred "github.com" "GitHub apple-touch-icon test"
     
@@ -146,7 +157,6 @@ run_tests() {
     echo -e "\n--- Category: favicon.ico ---"
     assert_url_returned "google.com" "favicon.ico"
     assert_url_returned "apple.com" "favicon.ico"
-    assert_url_returned "meetup.com" "favicon.ico"
     
     # Category 4: does NOT even a favicon.ico present
     echo -e "\n--- Category: No Icon available, should exit none zero ---"
