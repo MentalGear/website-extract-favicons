@@ -106,29 +106,95 @@ else
 fi
 log "[DEBUG] ICON_URL after manifest step: $ICON_URL"
 
-
-
 # --- Step 2: HTML <link rel=icon/...> ---
-# TODO: should prioritize <link rel="apple-touch-icon"> over normal <link rel=icon/...>
 if [ -z "$ICON_URL" ]; then
   log "[INFO] Trying HTML <link rel=icon> ..."
-  # New attribute extraction logic will go here
+  
+  # Extract all icon-related link elements with their attributes
+  # Use a temporary file to avoid pipeline hanging when no results
+  xmllint --html --xpath '//link[
+    translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="icon" or
+    translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="shortcut icon" or
+    translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="apple-touch-icon" or
+    translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="apple-touch-icon-precomposed"
+  ]' "$TMPDIR/page.html" 2>/dev/null > "$TMPDIR/icon_links.xml" || true
+  
+  # Only process if we found icon links
+  if [ -s "$TMPDIR/icon_links.xml" ]; then
+    # Parse each link element
+    while IFS= read -r line; do
+      if [[ "$line" == *"<link"* ]]; then
+        # Extract href using sed (more portable)
+        href=$(echo "$line" | sed -n 's/.*href=["'\'']\([^"'\'']*\)["'\''].*/\1/p' | head -n1)
+        
+        # Extract rel using sed (case insensitive)
+        rel=$(echo "$line" | sed -n 's/.*[Rr][Ee][Ll]=["'\'']\([^"'\'']*\)["'\''].*/\1/p' | head -n1 | tr '[:upper:]' '[:lower:]')
+        [ -z "$rel" ] && rel="icon"
+        
+        # Extract sizes using sed
+        sizes=$(echo "$line" | sed -n 's/.*[Ss][Ii][Zz][Ee][Ss]=["'\'']\([^"'\'']*\)["'\''].*/\1/p' | head -n1)
+        
+        if [ -n "$href" ]; then
+          # Calculate priority (lower number = higher priority)
+          priority=50
+          case "$rel" in
+            "apple-touch-icon"|"apple-touch-icon-precomposed")
+              priority=10 ;;
+            "icon")
+              priority=20 ;;
+            "shortcut icon")
+              priority=30 ;;
+          esac
+          
+          # Parse size for additional priority
+          if [ -n "$sizes" ]; then
+            if [[ "$sizes" == "any" ]]; then
+              size_num=99999
+              priority=$((priority - 5))  # SVG icons get slight priority boost
+            else
+              # Extract first dimension using sed
+              size_num=$(echo "$sizes" | sed 's/[^0-9].*//' | head -c 10)
+              [ -z "$size_num" ] && size_num=16
+              # Larger icons get better priority
+              if [ "$size_num" -ge 128 ]; then
+                priority=$((priority - 3))
+              elif [ "$size_num" -ge 64 ]; then
+                priority=$((priority - 2))
+              elif [ "$size_num" -ge 32 ]; then
+                priority=$((priority - 1))
+              fi
+            fi
+          else
+            size_num=16  # Default size assumption
+          fi
+          
+          echo -e "$priority\t$size_num\t$href\t$rel"
+        fi
+      fi
+    done < "$TMPDIR/icon_links.xml" > "$TMPDIR/icons_list.txt"
+    
+    # Sort by priority (ascending), then by size (descending)
+    if [ -s "$TMPDIR/icons_list.txt" ]; then
+      sort -k1,1n -k2,2nr "$TMPDIR/icons_list.txt" > "$TMPDIR/icons_sorted.txt"
+      mv "$TMPDIR/icons_sorted.txt" "$TMPDIR/icons_list.txt"
+      
+      if [ "$VERBOSE" -eq 1 ]; then
+        while IFS=$'\t' read -r P S H R; do
+          log "[DEBUG] Candidate rel=$R href=$H size=$S priority=$P"
+        done < "$TMPDIR/icons_list.txt"
+      fi
 
-  if [ -s "$TMPDIR/icons_list.txt" ]; then
-    while IFS=$'\t' read -r P S H R; do
-      log "[DEBUG] Candidate rel=$R href=$H size=$S priority=$P"
-    done < "$TMPDIR/icons_list.txt"
-
-    ICON_HREF=$(head -n1 "$TMPDIR/icons_list.txt" | cut -f3)
-    ICON_URL=$(python3 -c "import urllib.parse; print(urllib.parse.urljoin('$URL','$ICON_HREF'))")
-    log "[INFO] Selected HTML icon: $ICON_URL"
+      ICON_HREF=$(head -n1 "$TMPDIR/icons_list.txt" | cut -f3)
+      ICON_URL=$(python3 -c "import urllib.parse; print(urllib.parse.urljoin('$URL','$ICON_HREF'))")
+      log "[INFO] Selected HTML icon: $ICON_URL"
+    else
+      log "[WARN] No valid icon links found in HTML"
+    fi
   else
     log "[WARN] No <link rel=icon> elements found"
   fi
 fi
 log "[DEBUG] ICON_URL after HTML rel=icon step: $ICON_URL"
-
-
 
 # --- Step 3: Favicon.ico ---
 if [ -z "$ICON_URL" ]; then
@@ -155,7 +221,6 @@ EOF
   fi
 fi
 log "[DEBUG] ICON_URL after default favicon.ico path step: $ICON_URL"
-
 
 # --- Result ---
 if [ -z "$ICON_URL" ]; then

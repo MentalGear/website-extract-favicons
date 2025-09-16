@@ -95,7 +95,7 @@ run_tests() {
     # Category 2: has <link rel>
     echo -e '\n--- Category: <link rel="apple-touch-icon"> prefer over <link rel>  ---'
     # notion has apple touch icon and normal rel="link", touch icon should be preferred
-    # TODO: why is notion not working?
+    # TODO: Write test that ensures apple-touch-icon is preferred
     assert_url_returned "https://www.notion.com/" "<link rel>"
     
 
@@ -105,9 +105,9 @@ run_tests() {
     assert_url_returned "apple.com" "favicon.ico"
     assert_url_returned "meetup.com" "favicon.ico"
     
+
     # Category 4: does NOT even a favicon.ico present
-    echo -e "\n--- Category: No Icon available ---"
-    # TODO: check tests
+    echo -e "\n--- Category: No Icon available, should exit none zero ---"
     assert_no_url_returned "example.com" "Invalid favicon.ico (text/html)"
     assert_no_url_returned "gmail.com" "favicon.ico"
 
