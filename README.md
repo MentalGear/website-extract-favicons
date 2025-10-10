@@ -1,3 +1,7 @@
+# NOTE
+
+had the LLM add a convert to png function build in, but actually out of scope for library so I'll just leave it in a subbranch
+
 # Extract Favicon From Url
 CLI shell script attempting to extract the highest resolution favicon URL from a given website, by checking the following in order:
 
@@ -9,6 +13,7 @@ CLI shell script attempting to extract the highest resolution favicon URL from a
 Finally, if no favicon is found through these methods, it will exit with a none zero code.
 
 ## Open Tasks
+[ ] add option to convert returned image to a .png
 [ ] fix deterministic local tests with own server, as in /wip_local_test
 
 ## Usage
